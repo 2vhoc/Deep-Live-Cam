@@ -999,7 +999,6 @@ def update_opacity(value):
     modules.globals.face_opacity = int(value)
 
 
-# Modify the create_webcam_preview function to include the slider
 def create_webcam_preview():
     global preview_label, PREVIEW
 
@@ -1050,15 +1049,9 @@ def create_webcam_preview():
             if source_image is None and modules.globals.source_path:
                 source_image = get_one_face(cv2.imread(modules.globals.source_path))
 
-            original_frame = temp_frame.copy()
             for frame_processor in frame_processors:
                 temp_frame = frame_processor.process_frame(source_image, temp_frame)
 
-            # Apply opacity
-            opacity = modules.globals.face_opacity / 100
-            temp_frame = cv2.addWeighted(
-                temp_frame, opacity, original_frame, 1 - opacity, 0
-            )
         else:
             modules.globals.target_path = None
 

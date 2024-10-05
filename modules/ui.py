@@ -411,6 +411,19 @@ def create_root(
     )
     live_button.pack(side="left", padx=10, expand=True)
 
+    # FPS Switch in create_root
+    show_fps_value = ctk.BooleanVar(value=modules.globals.show_fps)
+    show_fps_switch = ctk.CTkSwitch(
+        options_column,
+        text="Show FPS",
+        variable=show_fps_value,
+        cursor="hand2",
+        command=lambda: setattr(modules.globals, "show_fps", show_fps_value.get()),
+        progress_color="#3a7ebf",
+        font=("Roboto", 14, "bold"),
+    )
+    show_fps_switch.pack(pady=5, anchor="w")
+
     stop_button = ModernButton(
         button_frame,
         text="Destroy",
@@ -1002,22 +1015,22 @@ def update_opacity(value):
 def create_webcam_preview():
     global preview_label, PREVIEW
 
-    camera = cv2.VideoCapture(0)
+    camera = cv2.VideoCapture(0)  # Open default camera (index 0)
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, PREVIEW_DEFAULT_WIDTH)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, PREVIEW_DEFAULT_HEIGHT)
-    camera.set(cv2.CAP_PROP_FPS, 60)
+    camera.set(cv2.CAP_PROP_FPS, 60)  # Set desired FPS (may not be achievable)
 
-    PREVIEW.deiconify()
+    PREVIEW.deiconify()  # Show the preview window
 
-    # Remove any existing widgets in PREVIEW window
+    # Remove existing widgets in PREVIEW
     for widget in PREVIEW.winfo_children():
         widget.destroy()
 
-    # Create a main frame to hold all widgets
+    # Main frame to hold all widgets
     main_frame = ctk.CTkFrame(PREVIEW)
     main_frame.pack(fill="both", expand=True)
 
-    # Create a frame for the preview label
+    # Frame for preview label
     preview_frame = ctk.CTkFrame(main_frame)
     preview_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
@@ -1025,39 +1038,59 @@ def create_webcam_preview():
     preview_label.pack(fill="both", expand=True)
 
     frame_processors = get_frame_processors_modules(modules.globals.frame_processors)
-
     source_image = None
 
+    fps_start_time = time.time()
+    fps_frames = 0
+
     def update_frame_size(event):
-        nonlocal temp_frame
+        nonlocal temp_frame  # Access temp_frame from outer scope
         if modules.globals.live_resizable:
             temp_frame = fit_image_to_size(temp_frame, event.width, event.height)
 
     preview_frame.bind("<Configure>", update_frame_size)
 
-    while camera:
+    while True:  # Main loop for capturing and processing frames
         ret, frame = camera.read()
         if not ret:
-            break
+            break  # Exit loop if frame capture fails
+
+        # FPS Calculation and Display
+        fps_frames += 1
+        fps_end_time = time.time()
+        fps_time_diff = fps_end_time - fps_start_time
+        if fps_time_diff > 0:
+            fps = int(fps_frames / fps_time_diff)
+            fps_text = f"FPS: {fps}"
+            if modules.globals.show_fps:
+                cv2.putText(
+                    frame,
+                    fps_text,
+                    (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (0, 255, 0),
+                    2,
+                )
+            fps_frames = 0
+            fps_start_time = time.time()
 
         temp_frame = frame.copy()
 
         if modules.globals.live_mirror:
-            temp_frame = cv2.flip(temp_frame, 1)
+            temp_frame = cv2.flip(temp_frame, 1)  # Mirror the frame horizontally
 
-        if not modules.globals.map_faces:
+        if not modules.globals.map_faces:  # Single face swap
             if source_image is None and modules.globals.source_path:
                 source_image = get_one_face(cv2.imread(modules.globals.source_path))
-
             for frame_processor in frame_processors:
                 temp_frame = frame_processor.process_frame(source_image, temp_frame)
-
-        else:
-            modules.globals.target_path = None
-
+        else:  # Many faces swap
+            modules.globals.target_path = None  # Not needed in live mode with mapping
             for frame_processor in frame_processors:
                 temp_frame = frame_processor.process_frame_v2(temp_frame)
 
+        # Convert and display the processed frame
         image = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(image)
         image = ImageOps.contain(
@@ -1070,10 +1103,10 @@ def create_webcam_preview():
         ROOT.update()
 
         if PREVIEW.state() == "withdrawn":
-            break
+            break  # Exit loop if preview window is closed
 
-    camera.release()
-    PREVIEW.withdraw()
+    camera.release()  # Release the camera
+    PREVIEW.withdraw()  # Hide the preview window
 
 
 def create_source_target_popup_for_webcam(root: ctk.CTk, map: list) -> None:

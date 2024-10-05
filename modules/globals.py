@@ -36,3 +36,4 @@ fp_ui: Dict[str, bool] = {}
 camera_input_combobox = None
 webcam_preview_running = False
 opacity = 100 
+show_fps = False
